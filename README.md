@@ -2,12 +2,13 @@
 
 A repository for learning machine learning from scratch.
 
-*Developed with the assistance of Antigravity to implement and test the codebase.*
+*Developed with the assistance of Antigravity to test the codebase.*
 
 ## Project Structure
 
 - `two_layer_mlp/`: Vanilla 2-layer MLP implementation and unit tests.
 - `sharded_mlp/`: Virtual sharded MLP implementation (Model Parallelism) and comparison tests.
+- `data_parallel_mlp/`: Data Parallel MLP implementation and comparison tests.
 
 ## Chapter 1: 2-Layer MLP
 
@@ -31,9 +32,19 @@ Extension of the 2-layer MLP to support "virtual sharding" (Model Parallelism).
 - **Row Parallelism**: Second linear layer is split across input dimensions.
 - **Synchronization**: Simulated `AllReduce` (sum) across virtual shards.
 
-### Testing
-Verification compares sharded outputs and gradients against the vanilla implementation.
-
 ```bash
 python3 -m unittest sharded_mlp/test_sharded.py
+```
+
+## Chapter 3: Data Parallelism
+
+Implementation of Data Parallelism where the batch is split across identical model replicas.
+
+### Architecture
+- **Replication**: Model is replicated across $N$ virtual devices.
+- **Batch Splitting**: Input batch is divided into sub-batches for each replica.
+- **Synchronization**: Gradients are synchronized using an `AllReduce` operation after the backward pass.
+
+```bash
+python3 -m unittest data_parallel_mlp/test_data_parallel.py
 ```
