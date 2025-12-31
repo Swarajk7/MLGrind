@@ -10,7 +10,7 @@ B: Batch size
 """
 
 class ShardedLinearColumn:
-    def __init__(self, in_features, out_features, num_shards, shard_id):
+    def __init__(self, in_features: int, out_features: int, num_shards: int, shard_id: int) -> None:
         """
         Matrix W is split into columns.
         W_shard shape: (in_features, out_features // num_shards)
@@ -21,14 +21,14 @@ class ShardedLinearColumn:
         assert out_features % num_shards == 0, "out_features must be divisible by num_shards"
         
         # TODO: Initialize sharded weights and biases
-        self.WDH_shard = np.random.randn(in_features, out_features // num_shards) * np.sqrt(2 / in_features)
-        self.bH_shard = np.zeros(out_features // num_shards)
+        self.WDH_shard: np.ndarray = np.random.randn(in_features, out_features // num_shards) * np.sqrt(2 / in_features)
+        self.bH_shard: np.ndarray = np.zeros(out_features // num_shards)
 
-        self.dWDH_shard = None
-        self.dbH_shard = None
-        self.xBD = None
+        self.dWDH_shard: np.ndarray | None = None
+        self.dbH_shard: np.ndarray | None = None
+        self.xBD: np.ndarray | None = None
 
-    def forward(self, xBD):
+    def forward(self, xBD: np.ndarray) -> np.ndarray:
         """
         Each shard computes a piece of the output dimension.
         Output shape: (B, out_features // num_shards)
@@ -36,7 +36,7 @@ class ShardedLinearColumn:
         self.xBD = xBD
         return np.einsum('BD, Dh -> Bh', xBD, self.WDH_shard) + self.bH_shard
 
-    def backward(self, dZBH_shard):
+    def backward(self, dZBH_shard: np.ndarray) -> np.ndarray:
         """
         dZBH_shard shape: (B, out_features // num_shards)
         Returns dXBD (B, in_features)
@@ -46,7 +46,7 @@ class ShardedLinearColumn:
         return np.einsum('Bh, Dh -> BD', dZBH_shard, self.WDH_shard)
 
 class ShardedLinearRow:
-    def __init__(self, in_features, out_features, num_shards, shard_id):
+    def __init__(self, in_features: int, out_features: int, num_shards: int, shard_id: int) -> None:
         """
         Matrix W is split into rows.
         W_shard shape: (in_features // num_shards, out_features)
@@ -55,14 +55,14 @@ class ShardedLinearRow:
         self.shard_id = shard_id
         assert in_features % num_shards == 0, "in_features must be divisible by num_shards"
         # TODO: Initialize sharded weights and biases
-        self.WDH_shard = np.random.randn(in_features // num_shards, out_features) * np.sqrt(2 / in_features) 
-        self.bH = np.zeros(out_features) 
-        self.x_shard = None
+        self.WDH_shard: np.ndarray = np.random.randn(in_features // num_shards, out_features) * np.sqrt(2 / in_features) 
+        self.bH: np.ndarray = np.zeros(out_features) 
+        self.x_shard: np.ndarray | None = None
 
-        self.dWDH_shard = None
-        self.dbH = None
+        self.dWDH_shard: np.ndarray | None = None
+        self.dbH: np.ndarray | None = None
 
-    def forward(self, x_shard):
+    def forward(self, x_shard: np.ndarray) -> np.ndarray:
         """
         Each shard computes a partial sum of the output.
         x_shard shape: (B, in_features // num_shards)
@@ -74,7 +74,7 @@ class ShardedLinearRow:
         #   W2 ]
         return np.einsum('Bd, dH -> BH', x_shard, self.WDH_shard) + self.bH
 
-    def backward(self, dZBH):
+    def backward(self, dZBH: np.ndarray) -> np.ndarray:
         """
         dZBH shape: (B, out_features)
         Returns dX_shard (B, in_features // num_shards)
@@ -84,18 +84,18 @@ class ShardedLinearRow:
         return np.einsum('BH, dH -> Bd', dZBH, self.WDH_shard)
 
 class ReLU:
-    def __init__(self):
-        self.mask = None
+    def __init__(self) -> None:
+        self.mask: np.ndarray | None = None
     
-    def forward(self, xBD):
+    def forward(self, xBD: np.ndarray) -> np.ndarray:
         self.mask = (xBD > 0).astype(float)
         return np.maximum(0, xBD)
     
-    def backward(self, dZBD):
+    def backward(self, dZBD: np.ndarray) -> np.ndarray:
         return np.where(self.mask, dZBD, 0)
 
 class ShardedMLP2Layer:
-    def __init__(self, input_dim, hidden_dim, output_dim, num_shards):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_shards: int) -> None:
         self.num_shards = num_shards
         
         # Each "device" (shard_id) has its own local layers
@@ -108,7 +108,7 @@ class ShardedMLP2Layer:
             }
             self.shards.append(shard_layers)
 
-    def forward(self, xBD):
+    def forward(self, xBD: np.ndarray) -> np.ndarray:
         """
         Simulate the parallel forward pass across all shards.
         1. Layer 1 (Column): Each shard gets full X, produces partial Hidden.
@@ -116,7 +116,6 @@ class ShardedMLP2Layer:
         3. Layer 2 (Row): Each shard gets partial Hidden, produces partial Output.
         4. AllReduce: Sum partial Outputs.
         """
-        # TODO: Implement simulated parallel forward pass
         outputs = []
         for i in range(self.num_shards):
             linear1_out_Bh = self.shards[i]['linear1'].forward(xBD)
@@ -126,9 +125,7 @@ class ShardedMLP2Layer:
         # simulate all reduce operation
         return sum(outputs)
         
-            
-
-    def backward(self, dZBO):
+    def backward(self, dZBO: np.ndarray) -> np.ndarray:
         """
         Simulate the parallel backward pass.
         1. Layer 2 (Row): Input dZBO, Output partial dHidden.
@@ -136,7 +133,6 @@ class ShardedMLP2Layer:
         3. Layer 1 (Column): Input partial dHidden, Output partial dX.
         4. AllReduce: Sum partial dX (though usually input gradients aren't summed in MP)
         """
-        # TODO: Implement simulated parallel backward pass
         gradients = []
         for i in range(self.num_shards):
             linear2_grad_Bh = self.shards[i]['linear2'].backward(dZBO)

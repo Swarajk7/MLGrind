@@ -2,6 +2,8 @@
 
 A repository for learning machine learning from scratch.
 
+*Developed with the assistance of Antigravity to implement and test the codebase.*
+
 ## Project Structure
 
 - `two_layer_mlp/`: Vanilla 2-layer MLP implementation and unit tests.
